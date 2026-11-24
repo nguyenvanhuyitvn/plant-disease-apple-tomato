@@ -1,0 +1,7 @@
+[server]
+headless = true
+address = "localhost"   # xem từ máy cá nhân qua: ssh -L 8501:localhost:8501 <user>@<server>
+port = 8501
+
+[browser]
+gatherUsageStats = false

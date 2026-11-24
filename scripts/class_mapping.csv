@@ -1,0 +1,28 @@
+unified_class,plantvillage_class,plantdoc_class,mapping_quality,note
+apple_scab,Apple___Apple_scab,Apple Scab Leaf,exact,
+apple_rust,Apple___Cedar_apple_rust,Apple rust leaf,exact,Cedar apple rust
+apple_healthy,Apple___healthy,Apple leaf,exact,
+blueberry_healthy,Blueberry___healthy,Blueberry leaf,exact,
+cherry_healthy,Cherry_(including_sour)___healthy,Cherry leaf,exact,
+corn_gray_leaf_spot,Corn_(maize)___Cercospora_leaf_spot Gray_leaf_spot,Corn Gray leaf spot,exact,
+corn_rust,Corn_(maize)___Common_rust_,Corn rust leaf,exact,
+corn_leaf_blight,Corn_(maize)___Northern_Leaf_Blight,Corn leaf blight,approx,PlantDoc ghi chung 'leaf blight'; can xem anh
+grape_black_rot,Grape___Black_rot,grape leaf black rot,exact,
+grape_healthy,Grape___healthy,grape leaf,exact,
+peach_healthy,Peach___healthy,Peach leaf,exact,
+pepper_bacterial_spot,"Pepper,_bell___Bacterial_spot",Bell_pepper leaf spot,approx,PlantDoc ghi chung 'leaf spot'; can xem anh
+pepper_healthy,"Pepper,_bell___healthy",Bell_pepper leaf,exact,
+potato_early_blight,Potato___Early_blight,Potato leaf early blight,exact,
+potato_late_blight,Potato___Late_blight,Potato leaf late blight,exact,
+raspberry_healthy,Raspberry___healthy,Raspberry leaf,exact,
+soybean_healthy,Soybean___healthy,Soyabean leaf,exact,
+squash_powdery_mildew,Squash___Powdery_mildew,Squash Powdery mildew leaf,exact,
+strawberry_healthy,Strawberry___healthy,Strawberry leaf,exact,
+tomato_bacterial_spot,Tomato___Bacterial_spot,Tomato leaf bacterial spot,exact,
+tomato_early_blight,Tomato___Early_blight,Tomato Early blight leaf,exact,
+tomato_late_blight,Tomato___Late_blight,Tomato leaf late blight,exact,
+tomato_leaf_mold,Tomato___Leaf_Mold,Tomato mold leaf,exact,
+tomato_septoria_leaf_spot,Tomato___Septoria_leaf_spot,Tomato Septoria leaf spot,exact,
+tomato_yellow_leaf_curl_virus,Tomato___Tomato_Yellow_Leaf_Curl_Virus,Tomato leaf yellow virus,approx,PlantDoc ghi 'yellow virus'; can xem anh
+tomato_mosaic_virus,Tomato___Tomato_mosaic_virus,Tomato leaf mosaic virus,exact,
+tomato_healthy,Tomato___healthy,Tomato leaf,exact,
