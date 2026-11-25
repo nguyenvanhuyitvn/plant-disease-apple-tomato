@@ -1,7 +1,7 @@
 # plantdx-species-linux – chẩn đoán bệnh lá táo / cà chua (bản cho server Linux + GPU NVIDIA)
 
 Teacher **ConvNeXt-Tiny** chưng cất sang student **MobileNetV3-Large**, thêm **loss nhất quán nền**, hiệu chỉnh
-độ tin cậy và lọc ảnh lạ. Dữ liệu: PlantVillage, Plant Pathology 2020 + 2021, PlantDoc. Mô hình xuất ONNX INT8
+độ tin cậy và lọc ảnh lạ. Dữ liệu: PlantVillage, Plant Pathology 2020 + 2021, PlantDoc, Tomato-Village (cà chua). Mô hình xuất ONNX INT8
 (khoảng 5 MB), xem kết quả bằng **Streamlit**.
 
 Bản này dành cho **Ubuntu 24.04, Python 3.12, GPU NVIDIA** (đã nhắm tới GPU Blackwell, mã thiết bị 2bb3).
@@ -62,8 +62,8 @@ Dừng giữa chừng rồi chạy lại vẫn được: lần chạy nào đã 
 
 | Biến môi trường | Ý nghĩa |
 |---|---|
-| `SEEDS="0 1 2"` | seed của MobileNetV3 ở thiết lập chính A-all, T-all |
-| `SEEDS_AUX="0 1 2"` | seed ở thiết lập phụ A-LODO-*, T0; `SEEDS_AUX=0` để rút gọn |
+| `SEEDS="0 1 2"` | seed của MobileNetV3 ở thiết lập chính A-all, T-all, T-LODO-TV |
+| `SEEDS_AUX="0 1 2"` | seed ở thiết lập phụ A-LODO-*, T0, T-LODO-PD, T-LODO-PV; `SEEDS_AUX=0` để rút gọn |
 | `ONLY="A-all T-all"` | chỉ chạy các thiết lập này |
 | `SKIP_POST=1` | chỉ huấn luyện, bỏ bước hiệu chỉnh / tổng hợp / xuất mô hình |
 | `WORKERS=8` | số tiến trình đọc ảnh; tăng lên 12–16 nếu GPU dưới 80% mà CPU còn rảnh |
@@ -83,13 +83,29 @@ bash scripts/run_experiments.sh        # khi cả hai xong: hiệu chỉnh, tổ
 | Thiết lập | Loài | Huấn luyện | Cấu hình |
 |---|---|---|---|
 | A-all | táo | PV + PP + PD | ConvNeXt-T, ResNet-50, MNv3 ERM / MixStyle / KD / nhất quán nền / đề xuất |
-| T-all | cà chua | PV + PD | như trên |
+| T-all | cà chua | PV + PD + TV | như trên |
+| T-LODO-TV | cà chua | PV + PD | như trên (lượt đầu gọi là T-all) |
 | A-LODO-PD, A-LODO-PP, A-LODO-PV | táo | bỏ một miền | ConvNeXt-T, MNv3 ERM / MixStyle / đề xuất |
+| T-LODO-PD, T-LODO-PV | cà chua | bỏ một miền | ConvNeXt-T, MNv3 ERM / MixStyle / đề xuất |
 | T0 | cà chua | PV | ConvNeXt-T, MNv3 ERM / MixStyle / đề xuất |
 
-- MNv3 chạy 3 seed; ConvNeXt-T và ResNet-50 chạy 1 seed. Tổng 74 lần chạy.
+- MNv3 chạy 3 seed; ConvNeXt-T và ResNet-50 chạy 1 seed. Tổng 111 lần chạy (lượt đầu 74, thêm TV 37).
+- TV (Tomato-Village) chỉ có 3/8 lớp cà chua (úa sớm, mốc sương, khoẻ mạnh). 5 lớp còn lại của TV (sâu vẽ bùa,
+  virus héo đốm, thiếu Mg/N/K) dùng làm ảnh lạ khó, chỉ để đánh giá (`ood_near_tv` trong `calib.json`).
+- `plantdx.eval_extra` chấm thêm miền mới cho lần chạy cũ mà không huấn luyện lại (bước 2b của script).
 - Mỗi lần chạy: 10 epoch × 7.680 ảnh, batch 64, AdamW lr 5e-4, cosine.
-- A-LODO-PV không có ảnh PlantVillage nên không có cặp ảnh nền: cấu hình "đề xuất" ở thiết lập này chỉ còn KD.
+- A-LODO-PV và T-LODO-PV không có ảnh PlantVillage nên không có cặp ảnh nền: cấu hình "đề xuất" ở hai thiết lập
+  này chỉ còn KD.
+
+### Thêm Tomato-Village trên server đã chạy xong lượt đầu (74 lần)
+
+Chỉ làm sau khi `logs/run.log` báo `ALL DONE`.
+
+```bash
+mv runs/tomato/T-all runs/tomato/T-LODO-TV                  # T-all cũ = PV + PD
+tar xf plantdx_tv_update.tar                                # mã nguồn đã sửa + dữ liệu TV + manifest cà chua mới
+ONLY="T-all T-LODO-PD T-LODO-PV" nohup bash scripts/run_experiments.sh > logs/run_tv.log 2>&1 &
+```
 
 ## 4. Kết quả và ứng dụng
 
@@ -123,8 +139,9 @@ plantdx-species-linux/
 │   ├── run_experiments.sh   toàn bộ thí nghiệm + hiệu chỉnh + tổng hợp + xuất mô hình
 │   ├── prepare_data.py      (chỉ khi làm sạch lại từ dữ liệu gốc) bước 1: PlantVillage + PlantDoc
 │   ├── prepare_species.py   (chỉ khi làm sạch lại) bước 2: táo + cà chua + Plant Pathology
+│   ├── prepare_tomato_village.py  (chỉ khi làm sạch lại) bước 3: Tomato-Village cho cà chua
 │   └── class_mapping.csv
-├── src/plantdx/   data.py, background.py, models.py, train.py, calibrate.py, summarize.py, deploy.py, metrics.py
+├── src/plantdx/   data.py, background.py, models.py, train.py, calibrate.py, summarize.py, deploy.py, metrics.py, eval_extra.py
 ├── app/           streamlit_app.py, inference.py (ONNX Runtime, không cần PyTorch)
 ├── data/processed/   ảnh đã làm sạch + manifest (từ gói dữ liệu, không đưa vào git)
 └── .streamlit/config.toml

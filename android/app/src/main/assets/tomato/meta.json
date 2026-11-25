@@ -1,0 +1,94 @@
+{
+  "species": "tomato",
+  "classes": [
+    "tomato_healthy",
+    "tomato_bacterial_spot",
+    "tomato_early_blight",
+    "tomato_late_blight",
+    "tomato_leaf_mold",
+    "tomato_septoria_leaf_spot",
+    "tomato_yellow_leaf_curl_virus",
+    "tomato_mosaic_virus"
+  ],
+  "names_vi": [
+    "Cà chua – Lá khỏe mạnh",
+    "Cà chua – Đốm vi khuẩn",
+    "Cà chua – Bệnh úa sớm",
+    "Cà chua – Bệnh mốc sương",
+    "Cà chua – Bệnh mốc lá",
+    "Cà chua – Đốm lá Septoria",
+    "Cà chua – Virus xoăn vàng lá",
+    "Cà chua – Virus khảm"
+  ],
+  "model": "mobilenetv3_large_100",
+  "config": "proposed",
+  "setting": "T-all",
+  "source_ckpt": "runs/tomato/T-all/proposed/seed0/best.pt",
+  "img_size": 224,
+  "resize": 255,
+  "mean": [
+    0.485,
+    0.456,
+    0.406
+  ],
+  "std": [
+    0.229,
+    0.224,
+    0.225
+  ],
+  "size_mb": {
+    "int8": 4.722026,
+    "fp32": 16.836284
+  },
+  "latency_ms_1thread": {
+    "mean_ms": 3.218930112197995,
+    "p95_ms": 3.264467604458332
+  },
+  "T": 0.6558597813591882,
+  "tau_energy": 1.2492444515228271,
+  "tau_conf": 0.0,
+  "target_acc": 0.9,
+  "val_coverage": 1.0,
+  "val_nll_before": 0.38584020733833313,
+  "val_nll_after": 0.31947559118270874,
+  "val_ece_before": 0.10674149040904886,
+  "val_ece_after": 0.012302010272845172,
+  "ood_val": {
+    "auroc": 0.829293277441391,
+    "fpr_at_95tpr": 0.712,
+    "id_kept_at_tau": 0.9496972519795063,
+    "ood_rejected_at_tau": 0.288
+  },
+  "test": {
+    "pv": {
+      "ece_before": 0.12730516701277944,
+      "ece_after": 0.030307687909954723,
+      "aurc": 0.0015537336076754309,
+      "acc_all": 0.9643681953150776,
+      "coverage": 0.9736060706037611,
+      "acc_answered": 0.9749237546594375
+    },
+    "pd": {
+      "ece_before": 0.07302306494751915,
+      "ece_after": 0.14436620083011567,
+      "aurc": 0.22876455978981644,
+      "acc_all": 0.5683060109289617,
+      "coverage": 0.7486338797814208,
+      "acc_answered": 0.6496350364963503
+    },
+    "tv": {
+      "ece_before": 0.2064930744469166,
+      "ece_after": 0.06869263723492623,
+      "aurc": 0.026863265276050336,
+      "acc_all": 0.8875,
+      "coverage": 0.975,
+      "acc_answered": 0.8846153846153846
+    },
+    "ood_test": {
+      "auroc": 0.8479742967010726,
+      "fpr_at_95tpr": 0.6453333333333333,
+      "id_kept_at_tau": 0.9611414693381907,
+      "ood_rejected_at_tau": 0.30466666666666664
+    }
+  }
+}

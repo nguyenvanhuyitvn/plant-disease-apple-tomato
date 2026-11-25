@@ -15,6 +15,7 @@ Chạy:  .venv/bin/python scripts/prepare_data.py --data-dir data --workers 8
   stats_by_class.csv     số ảnh theo lớp x nguồn x tập
   qa/                    ảnh kiểm tra trực quan
 """
+
 from __future__ import annotations
 
 import argparse
@@ -34,10 +35,10 @@ from sklearn.model_selection import StratifiedGroupKFold
 
 ImageFile.LOAD_TRUNCATED_IMAGES = False
 SEED = 42
-VAL_FOLDS = 7            # 1/7 ~ 14% của train làm validation
-CROP_MARGIN = 0.10       # nới bounding box 10% mỗi phía
-MIN_BOX_SIDE = 32        # bỏ lá có cạnh nhỏ hơn 32 px
-PHASH_MAX_DIST = 4       # khoảng cách Hamming coi là "gần trùng"
+VAL_FOLDS = 7  # 1/7 ~ 14% của train làm validation
+CROP_MARGIN = 0.10  # nới bounding box 10% mỗi phía
+MIN_BOX_SIDE = 32  # bỏ lá có cạnh nhỏ hơn 32 px
+PHASH_MAX_DIST = 4  # khoảng cách Hamming coi là "gần trùng"
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 
@@ -127,8 +128,13 @@ def extract_case_collisions(det: Path) -> dict:
     """Repo PlantDoc có các file chỉ khác chữ hoa/thường (vd. Peach-Leaf.jpg và peach-leaf.jpg).
     Trên macOS/Windows chỉ một bản được checkout, nên lấy từng bản từ git ra thư mục riêng."""
     import subprocess
-    ls = subprocess.run(["git", "-C", str(det), "ls-tree", "-r", "--name-only", "HEAD"],
-                        capture_output=True, text=True, check=True).stdout.splitlines()
+
+    ls = subprocess.run(
+        ["git", "-C", str(det), "ls-tree", "-r", "--name-only", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.splitlines()
     groups = defaultdict(list)
     for p in ls:
         groups[p.lower()].append(p)
@@ -140,17 +146,28 @@ def extract_case_collisions(det: Path) -> dict:
             dst = det.parent / "case_collisions" / f"{k:03d}_{v}" / Path(p).name
             if not dst.exists():
                 dst.parent.mkdir(parents=True, exist_ok=True)
-                blob = subprocess.run(["git", "-C", str(det), "show", f"HEAD:{p}"],
-                                      capture_output=True, check=True).stdout
+                blob = subprocess.run(
+                    ["git", "-C", str(det), "show", f"HEAD:{p}"],
+                    capture_output=True,
+                    check=True,
+                ).stdout
                 dst.write_bytes(blob)
             out[(Path(p).parent.name, Path(p).name)] = dst
     print(f"[PlantDoc] tach {len(out)} file trung ten khac hoa/thuong")
     return out
 
 
-def prepare_plantdoc(raw: Path, out: Path, mapping: pd.DataFrame, workers: int, removed: list):
+def prepare_plantdoc(
+    raw: Path, out: Path, mapping: pd.DataFrame, workers: int, removed: list
+):
     det = raw / "plantdoc" / "detection"
-    pd2u = dict(zip(mapping.plantdoc_class.str.lower().str.split().str.join(" "), mapping.unified_class, strict=True))
+    pd2u = dict(
+        zip(
+            mapping.plantdoc_class.str.lower().str.split().str.join(" "),
+            mapping.unified_class,
+            strict=True,
+        )
+    )
 
     boxes = []
     for split, folder in [("train", "TRAIN"), ("test", "TEST")]:
@@ -159,29 +176,47 @@ def prepare_plantdoc(raw: Path, out: Path, mapping: pd.DataFrame, workers: int, 
         df["folder"] = folder
         boxes.append(df)
     boxes = pd.concat(boxes, ignore_index=True)
-    boxes["class_norm"] = boxes["class"].astype(str).str.lower().str.split().str.join(" ")
+    boxes["class_norm"] = (
+        boxes["class"].astype(str).str.lower().str.split().str.join(" ")
+    )
     boxes["unified_class"] = boxes["class_norm"].map(pd2u)
 
     # --- tìm file ảnh thật cho mỗi tên trong CSV
-    files = {(f.parent.name, f.name): f for f in det.glob("*/*") if f.suffix.lower() not in {".xml"} and f.is_file()}
+    files = {
+        (f.parent.name, f.name): f
+        for f in det.glob("*/*")
+        if f.suffix.lower() not in {".xml"} and f.is_file()
+    }
     files.update(extract_case_collisions(det))
-    boxes["img_path"] = [str(files.get((fo, fn), "")) for fo, fn in zip(boxes.folder, boxes.filename, strict=True)]
+    boxes["img_path"] = [
+        str(files.get((fo, fn), ""))
+        for fo, fn in zip(boxes.folder, boxes.filename, strict=True)
+    ]
     missing = boxes[boxes.img_path == ""]
-    for fn, sp in missing[["filename", "split"]].drop_duplicates().itertuples(index=False):
+    for fn, sp in (
+        missing[["filename", "split"]].drop_duplicates().itertuples(index=False)
+    ):
         removed.append(("plantdoc", sp, fn, "khong tim thay file anh"))
     boxes = boxes[boxes.img_path != ""]
 
     unmapped = boxes[boxes.unified_class.isna()]
     for (cls, sp), n in unmapped.groupby(["class", "split"]).size().items():
-        removed.append(("plantdoc", sp, f"{n} box lop '{cls}'", "lop khong nam trong 27 lop chung"))
+        removed.append(
+            ("plantdoc", sp, f"{n} box lop '{cls}'", "lop khong nam trong 27 lop chung")
+        )
     boxes = boxes[boxes.unified_class.notna()].copy()
 
     # --- bảng ảnh (mỗi ảnh gốc một dòng)
-    imgs = (boxes.groupby(["split", "img_path"])
-            .agg(classes=("unified_class", lambda s: tuple(sorted(set(s)))),
-                 csv_w=("width", "first"), csv_h=("height", "first"),
-                 filename=("filename", "first"))
-            .reset_index())
+    imgs = (
+        boxes.groupby(["split", "img_path"])
+        .agg(
+            classes=("unified_class", lambda s: tuple(sorted(set(s)))),
+            csv_w=("width", "first"),
+            csv_h=("height", "first"),
+            filename=("filename", "first"),
+        )
+        .reset_index()
+    )
     print(f"[PlantDoc] {len(imgs)} anh, {len(boxes)} box sau khi loc lop")
 
     hashes = hash_many(imgs.img_path.tolist(), workers)
@@ -197,8 +232,14 @@ def prepare_plantdoc(raw: Path, out: Path, mapping: pd.DataFrame, workers: int, 
 
     size_bad = imgs[(imgs.real_w != imgs.csv_w) | (imgs.real_h != imgs.csv_h)]
     for r in size_bad.itertuples():
-        removed.append(("plantdoc", r.split, r.filename,
-                        f"kich thuoc anh {r.real_w}x{r.real_h} khac nhan {r.csv_w}x{r.csv_h}"))
+        removed.append(
+            (
+                "plantdoc",
+                r.split,
+                r.filename,
+                f"kich thuoc anh {r.real_w}x{r.real_h} khac nhan {r.csv_w}x{r.csv_h}",
+            )
+        )
     imgs = imgs[~imgs.index.isin(size_bad.index)].reset_index(drop=True)
 
     # --- gom nhóm ảnh trùng / gần trùng (md5 giống hoặc phash gần)
@@ -222,30 +263,46 @@ def prepare_plantdoc(raw: Path, out: Path, mapping: pd.DataFrame, workers: int, 
         splits = set(sub.split)
         for r in sub.itertuples():
             dup_rows.append((g, r.split, r.filename, "|".join(r.classes)))
-        if len(labels) > 1:                      # nhãn mâu thuẫn -> loại cả nhóm
+        if len(labels) > 1:  # nhãn mâu thuẫn -> loại cả nhóm
             for r in sub.itertuples():
                 keep[r.Index] = False
-                removed.append(("plantdoc", r.split, r.filename, "anh trung nhung nhan mau thuan"))
-        elif splits == {"train", "test"}:       # rò rỉ -> giữ bản test, bỏ bản train
+                removed.append(
+                    ("plantdoc", r.split, r.filename, "anh trung nhung nhan mau thuan")
+                )
+        elif splits == {"train", "test"}:  # rò rỉ -> giữ bản test, bỏ bản train
             for r in sub[sub.split == "train"].itertuples():
                 keep[r.Index] = False
-                removed.append(("plantdoc", r.split, r.filename, "trung voi anh trong test (ro ri)"))
+                removed.append(
+                    (
+                        "plantdoc",
+                        r.split,
+                        r.filename,
+                        "trung voi anh trong test (ro ri)",
+                    )
+                )
             for r in sub[sub.split == "test"].iloc[1:].itertuples():
                 keep[r.Index] = False
-                removed.append(("plantdoc", r.split, r.filename, "anh trung lap trong cung tap"))
-        else:                                    # trùng trong cùng một tập -> giữ 1
+                removed.append(
+                    ("plantdoc", r.split, r.filename, "anh trung lap trong cung tap")
+                )
+        else:  # trùng trong cùng một tập -> giữ 1
             for r in sub.iloc[1:].itertuples():
                 keep[r.Index] = False
-                removed.append(("plantdoc", r.split, r.filename, "anh trung lap trong cung tap"))
-    pd.DataFrame(dup_rows, columns=["dup_group", "split", "filename", "classes"]).to_csv(
-        out / "qa" / "plantdoc_duplicate_groups.csv", index=False)
+                removed.append(
+                    ("plantdoc", r.split, r.filename, "anh trung lap trong cung tap")
+                )
+    pd.DataFrame(
+        dup_rows, columns=["dup_group", "split", "filename", "classes"]
+    ).to_csv(out / "qa" / "plantdoc_duplicate_groups.csv", index=False)
     imgs = imgs[keep].reset_index(drop=True)
     imgs["source_id"] = [f"pd_{i:05d}" for i in range(len(imgs))]
     print(f"[PlantDoc] con {len(imgs)} anh sau khi loai trung lap")
     return boxes, imgs
 
 
-def crop_plantdoc(boxes: pd.DataFrame, imgs: pd.DataFrame, out: Path, removed: list) -> pd.DataFrame:
+def crop_plantdoc(
+    boxes: pd.DataFrame, imgs: pd.DataFrame, out: Path, removed: list
+) -> pd.DataFrame:
     rows = []
     sid = dict(zip(imgs.img_path, imgs.source_id, strict=True))
     boxes = boxes[boxes.img_path.isin(sid)]
@@ -255,20 +312,49 @@ def crop_plantdoc(boxes: pd.DataFrame, imgs: pd.DataFrame, out: Path, removed: l
             im = im.convert("RGB")
             W, H = im.size
             for k, b in enumerate(sub.itertuples()):
-                x1, y1, x2, y2 = float(b.xmin), float(b.ymin), float(b.xmax), float(b.ymax)
+                x1, y1, x2, y2 = (
+                    float(b.xmin),
+                    float(b.ymin),
+                    float(b.xmax),
+                    float(b.ymax),
+                )
                 w, h = x2 - x1, y2 - y1
                 if min(w, h) < MIN_BOX_SIDE:
-                    removed.append(("plantdoc_crop", b.split, f"{b.filename}#{k}", f"box qua nho ({w:.0f}x{h:.0f})"))
+                    removed.append(
+                        (
+                            "plantdoc_crop",
+                            b.split,
+                            f"{b.filename}#{k}",
+                            f"box qua nho ({w:.0f}x{h:.0f})",
+                        )
+                    )
                     continue
-                box = (int(max(0, x1 - CROP_MARGIN * w)), int(max(0, y1 - CROP_MARGIN * h)),
-                       int(min(W, x2 + CROP_MARGIN * w)), int(min(H, y2 + CROP_MARGIN * h)))
-                rel = Path("processed/plantdoc_crops") / b.split / b.unified_class / f"{source_id}_{k:02d}.jpg"
+                box = (
+                    int(max(0, x1 - CROP_MARGIN * w)),
+                    int(max(0, y1 - CROP_MARGIN * h)),
+                    int(min(W, x2 + CROP_MARGIN * w)),
+                    int(min(H, y2 + CROP_MARGIN * h)),
+                )
+                rel = (
+                    Path("processed/plantdoc_crops")
+                    / b.split
+                    / b.unified_class
+                    / f"{source_id}_{k:02d}.jpg"
+                )
                 dst = out.parent / rel
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 im.crop(box).save(dst, quality=95)
-                rows.append(dict(path=str(rel), dataset="plantdoc_crop", split=b.split,
-                                 unified_class=b.unified_class, group_id=source_id, mask_path="",
-                                 source_file=Path(img_path).name))
+                rows.append(
+                    dict(
+                        path=str(rel),
+                        dataset="plantdoc_crop",
+                        split=b.split,
+                        unified_class=b.unified_class,
+                        group_id=source_id,
+                        mask_path="",
+                        source_file=Path(img_path).name,
+                    )
+                )
     return pd.DataFrame(rows)
 
 
@@ -278,14 +364,27 @@ def plantdoc_full_images(imgs: pd.DataFrame, out: Path) -> pd.DataFrame:
     for r in imgs.itertuples():
         if len(r.classes) != 1:
             continue
-        rel = Path("processed/plantdoc_full") / r.split / r.classes[0] / f"{r.source_id}.jpg"
+        rel = (
+            Path("processed/plantdoc_full")
+            / r.split
+            / r.classes[0]
+            / f"{r.source_id}.jpg"
+        )
         dst = out.parent / rel
         dst.parent.mkdir(parents=True, exist_ok=True)
         with Image.open(r.img_path) as im:
             im.convert("RGB").save(dst, quality=95)
-        rows.append(dict(path=str(rel), dataset="plantdoc_full", split=r.split,
-                         unified_class=r.classes[0], group_id=r.source_id, mask_path="",
-                         source_file=Path(r.img_path).name))
+        rows.append(
+            dict(
+                path=str(rel),
+                dataset="plantdoc_full",
+                split=r.split,
+                unified_class=r.classes[0],
+                group_id=r.source_id,
+                mask_path="",
+                source_file=Path(r.img_path).name,
+            )
+        )
     return pd.DataFrame(rows)
 
 
@@ -307,7 +406,9 @@ def leaf_key(split_path: str) -> str:
     return stem.split("___", 1)[-1].strip().lower()
 
 
-def prepare_plantvillage(raw: Path, out: Path, mapping: pd.DataFrame, removed: list) -> pd.DataFrame:
+def prepare_plantvillage(
+    raw: Path, out: Path, mapping: pd.DataFrame, removed: list
+) -> pd.DataFrame:
     pv = raw / "plantvillage"
     pv2u = dict(zip(mapping.plantvillage_class, mapping.unified_class, strict=True))
     zf = zipfile.ZipFile(pv / "data.zip")
@@ -329,23 +430,41 @@ def prepare_plantvillage(raw: Path, out: Path, mapping: pd.DataFrame, removed: l
     df["unified_class"] = df.pv_class.map(pv2u)
     dropped = df[df.unified_class.isna()]
     for (c, sp), n in dropped.groupby(["pv_class", "split"]).size().items():
-        removed.append(("plantvillage", sp, f"{n} anh lop '{c}'", "lop khong nam trong 27 lop chung"))
+        removed.append(
+            (
+                "plantvillage",
+                sp,
+                f"{n} anh lop '{c}'",
+                "lop khong nam trong 27 lop chung",
+            )
+        )
     df = df[df.unified_class.notna()].copy()
 
     # leaf_id
     leaf_map = load_leaf_map(pv / "leaf_grouping" / "leaf-map.json")
     keys = df.split_path.map(leaf_key)
-    df["leaf_id"] = [leaf_map.get((c, k)) for c, k in zip(df.pv_class, keys, strict=True)]
+    df["leaf_id"] = [
+        leaf_map.get((c, k)) for c, k in zip(df.pv_class, keys, strict=True)
+    ]
     n_no_leaf = int(df.leaf_id.isna().sum())
     df["leaf_id"] = df.leaf_id.fillna("img_" + df.pv_class + "/" + keys)
     df["group_id"] = "pv_" + df.leaf_id.astype(str)
-    print(f"[PlantVillage] {len(df)} anh; {n_no_leaf} anh khong co leaf_id (dung chinh anh lam nhom)")
+    print(
+        f"[PlantVillage] {len(df)} anh; {n_no_leaf} anh khong co leaf_id (dung chinh anh lam nhom)"
+    )
     # cách chia gốc có vài lá nằm ở cả train và test -> bỏ bản train của các lá đó
     cross = df.groupby("group_id").split.nunique()
     cross = set(cross[cross > 1].index)
     bad = df[df.group_id.isin(cross) & (df.split == "train")]
     for r in bad.itertuples():
-        removed.append(("plantvillage", "train", r.split_path, "cung la voi anh trong test (ro ri)"))
+        removed.append(
+            (
+                "plantvillage",
+                "train",
+                r.split_path,
+                "cung la voi anh trong test (ro ri)",
+            )
+        )
     df = df.drop(bad.index)
 
     # giải nén ảnh color của 27 lớp + ảnh segmented tương ứng của tập train
@@ -358,10 +477,20 @@ def prepare_plantvillage(raw: Path, out: Path, mapping: pd.DataFrame, removed: l
 
     paths, masks = [], []
     for r in df.itertuples():
-        zname = prefix + r.split_path.split("raw/", 1)[-1] if r.split_path.startswith("raw/") else prefix + r.split_path
+        zname = (
+            prefix + r.split_path.split("raw/", 1)[-1]
+            if r.split_path.startswith("raw/")
+            else prefix + r.split_path
+        )
         if zname not in name_set:
-            paths.append(None); masks.append(""); continue
-        rel = Path("processed/plantvillage/color") / r.unified_class / safe_name(Path(r.split_path).name)
+            paths.append(None)
+            masks.append("")
+            continue
+        rel = (
+            Path("processed/plantvillage/color")
+            / r.unified_class
+            / safe_name(Path(r.split_path).name)
+        )
         dst = out.parent / rel
         if not dst.exists():
             dst.parent.mkdir(parents=True, exist_ok=True)
@@ -371,7 +500,11 @@ def prepare_plantvillage(raw: Path, out: Path, mapping: pd.DataFrame, removed: l
         if r.split == "train":
             sname = seg_index.get((r.pv_class, Path(r.split_path).stem.lower()))
             if sname:
-                mrel = Path("processed/plantvillage/segmented") / r.unified_class / safe_name(Path(sname).name)
+                mrel = (
+                    Path("processed/plantvillage/segmented")
+                    / r.unified_class
+                    / safe_name(Path(sname).name)
+                )
                 mdst = out.parent / mrel
                 if not mdst.exists():
                     mdst.parent.mkdir(parents=True, exist_ok=True)
@@ -382,15 +515,29 @@ def prepare_plantvillage(raw: Path, out: Path, mapping: pd.DataFrame, removed: l
     df["mask_path"] = masks
     miss = df[df.path.isna()]
     for r in miss.itertuples():
-        removed.append(("plantvillage", r.split, r.split_path, "khong co trong data.zip"))
+        removed.append(
+            ("plantvillage", r.split, r.split_path, "khong co trong data.zip")
+        )
     df = df[df.path.notna()].copy()
     df["dataset"] = "plantvillage"
     df["source_file"] = df.split_path.map(lambda p: Path(p).name)
-    return df[["path", "dataset", "split", "unified_class", "group_id", "mask_path", "source_file"]]
+    return df[
+        [
+            "path",
+            "dataset",
+            "split",
+            "unified_class",
+            "group_id",
+            "mask_path",
+            "source_file",
+        ]
+    ]
 
 
 # ----------------------------------------------------------------------------- rò rỉ chéo
-def cross_dataset_leak(manifest: pd.DataFrame, data_dir: Path, workers: int, removed: list) -> pd.DataFrame:
+def cross_dataset_leak(
+    manifest: pd.DataFrame, data_dir: Path, workers: int, removed: list
+) -> pd.DataFrame:
     """Loại ảnh PlantDoc trùng với PlantVillage:
        - PlantDoc test trùng bất kỳ ảnh PV nào  -> bỏ khỏi PlantDoc test
        - PlantDoc train/val trùng PV test       -> bỏ khỏi PlantDoc train/val
@@ -410,12 +557,19 @@ def cross_dataset_leak(manifest: pd.DataFrame, data_dir: Path, workers: int, rem
         rows.append((r.group_id, r.split, pv.iloc[j].path, pv_split[j], d))
         if r.split == "test" or pv_split[j] == "test":
             bad_groups.add(r.group_id)
-    pd.DataFrame(rows, columns=["plantdoc_group", "plantdoc_split", "pv_path", "pv_split", "hamming"]).to_csv(
-        data_dir / "processed" / "qa" / "cross_dataset_matches.csv", index=False)
+    pd.DataFrame(
+        rows,
+        columns=["plantdoc_group", "plantdoc_split", "pv_path", "pv_split", "hamming"],
+    ).to_csv(data_dir / "processed" / "qa" / "cross_dataset_matches.csv", index=False)
     for g in sorted(bad_groups):
         removed.append(("plantdoc", "", g, "trung voi anh PlantVillage (ro ri cheo)"))
     print(f"[Cheo] {len(pairs)} cap gan trung, loai {len(bad_groups)} anh PlantDoc")
-    return manifest[~(manifest.dataset.str.startswith("plantdoc") & manifest.group_id.isin(bad_groups))]
+    return manifest[
+        ~(
+            manifest.dataset.str.startswith("plantdoc")
+            & manifest.group_id.isin(bad_groups)
+        )
+    ]
 
 
 # ----------------------------------------------------------------------------- QA
@@ -436,14 +590,24 @@ def contact_sheet(paths: list[Path], dst: Path, cols=8, size=128):
     sheet.save(dst, quality=85)
 
 
-def make_qa(manifest: pd.DataFrame, boxes: pd.DataFrame, data_dir: Path, mapping: pd.DataFrame):
+def make_qa(
+    manifest: pd.DataFrame, boxes: pd.DataFrame, data_dir: Path, mapping: pd.DataFrame
+):
     qa = data_dir / "processed" / "qa"
     rng = np.random.default_rng(SEED)
     # 1) lưới ảnh từng lớp: hàng trên PV, hàng dưới PlantDoc
     for cls in mapping.unified_class:
-        pv = manifest[(manifest.dataset == "plantvillage") & (manifest.unified_class == cls)].path.tolist()
-        pc = manifest[(manifest.dataset == "plantdoc_crop") & (manifest.unified_class == cls)].path.tolist()
-        pick = lambda L, n: [data_dir / L[i] for i in rng.choice(len(L), min(n, len(L)), replace=False)] if L else []
+        pv = manifest[
+            (manifest.dataset == "plantvillage") & (manifest.unified_class == cls)
+        ].path.tolist()
+        pc = manifest[
+            (manifest.dataset == "plantdoc_crop") & (manifest.unified_class == cls)
+        ].path.tolist()
+        pick = lambda L, n: (
+            [data_dir / L[i] for i in rng.choice(len(L), min(n, len(L)), replace=False)]
+            if L
+            else []
+        )
         contact_sheet(pick(pv, 16) + pick(pc, 24), qa / "class_grids" / f"{cls}.jpg")
     # 2) vẽ box lên vài ảnh PlantDoc gốc
     sample = boxes.drop_duplicates("img_path").sample(12, random_state=SEED).img_path
@@ -452,8 +616,12 @@ def make_qa(manifest: pd.DataFrame, boxes: pd.DataFrame, data_dir: Path, mapping
             im = im.convert("RGB")
             dr = ImageDraw.Draw(im)
             for b in boxes[boxes.img_path == ip].itertuples():
-                dr.rectangle([b.xmin, b.ymin, b.xmax, b.ymax], outline=(255, 0, 0), width=3)
-                dr.text((b.xmin + 3, b.ymin + 3), str(b.unified_class), fill=(255, 0, 0))
+                dr.rectangle(
+                    [b.xmin, b.ymin, b.xmax, b.ymax], outline=(255, 0, 0), width=3
+                )
+                dr.text(
+                    (b.xmin + 3, b.ymin + 3), str(b.unified_class), fill=(255, 0, 0)
+                )
             im.thumbnail((800, 800))
             (qa / "bbox_check").mkdir(parents=True, exist_ok=True)
             im.save(qa / "bbox_check" / f"{k:02d}.jpg", quality=85)
@@ -487,7 +655,11 @@ def main():
         is_val = val_split(manifest[m], "unified_class", "group_id")
         manifest.loc[is_val[is_val].index, "split"] = "val"
     # ảnh nguyên PlantDoc theo cùng phân chia với lá cắt
-    val_groups = set(manifest[(manifest.dataset == "plantdoc_crop") & (manifest.split == "val")].group_id)
+    val_groups = set(
+        manifest[
+            (manifest.dataset == "plantdoc_crop") & (manifest.split == "val")
+        ].group_id
+    )
     m = (manifest.dataset == "plantdoc_full") & manifest.group_id.isin(val_groups)
     manifest.loc[m, "split"] = "val"
 
@@ -496,21 +668,35 @@ def main():
         sub = manifest[manifest.dataset == ds]
         leak = sub.groupby("group_id").split.nunique()
         assert (leak == 1).all(), f"{ds}: {int((leak > 1).sum())} nhom nam o nhieu tap"
-    assert manifest.path.map(lambda p: (data_dir / p).exists()).all(), "co duong dan khong ton tai"
+    assert manifest.path.map(lambda p: (data_dir / p).exists()).all(), (
+        "co duong dan khong ton tai"
+    )
 
     manifest = manifest.sort_values(["dataset", "split", "unified_class", "path"])
     manifest.to_csv(out / "manifest.csv", index=False)
-    pd.DataFrame(removed, columns=["dataset", "split", "item", "reason"]).to_csv(out / "removed_log.csv", index=False)
-    stats = manifest.pivot_table(index="unified_class", columns=["dataset", "split"], values="path",
-                                 aggfunc="count", fill_value=0)
+    pd.DataFrame(removed, columns=["dataset", "split", "item", "reason"]).to_csv(
+        out / "removed_log.csv", index=False
+    )
+    stats = manifest.pivot_table(
+        index="unified_class",
+        columns=["dataset", "split"],
+        values="path",
+        aggfunc="count",
+        fill_value=0,
+    )
     stats.to_csv(out / "stats_by_class.csv")
-    make_qa(manifest, boxes[boxes.img_path.isin(set(pd_imgs.img_path))], data_dir, mapping)
+    make_qa(
+        manifest, boxes[boxes.img_path.isin(set(pd_imgs.img_path))], data_dir, mapping
+    )
 
     print("\n=== TONG KET ===")
     print(manifest.groupby(["dataset", "split"]).size().unstack(fill_value=0))
     print("\nLy do loai:")
-    print(pd.DataFrame(removed, columns=["dataset", "split", "item", "reason"])
-          .groupby(["dataset", "reason"]).size())
+    print(
+        pd.DataFrame(removed, columns=["dataset", "split", "item", "reason"])
+        .groupby(["dataset", "reason"])
+        .size()
+    )
 
 
 if __name__ == "__main__":

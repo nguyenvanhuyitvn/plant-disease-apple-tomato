@@ -11,3 +11,4 @@ models_smoke/
 .streamlit/secrets.toml
 dist/
 logs/
+android/PlantDx-TaoCaChua.apk

@@ -6,6 +6,7 @@ Quyết định 3 mức:
   uncertain : xác suất lớn nhất (đã hiệu chỉnh) < τ_c -> "chưa chắc, hãy chụp lại"
   ok        : trả về tên bệnh
 """
+
 from __future__ import annotations
 
 import json
@@ -19,7 +20,9 @@ import onnxruntime as ort
 from PIL import Image, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
-MODELS = Path(os.environ.get("PLANTDX_MODELS", ROOT / "models"))   # đổi thư mục mô hình khi chạy thử
+MODELS = Path(
+    os.environ.get("PLANTDX_MODELS", ROOT / "models")
+)  # đổi thư mục mô hình khi chạy thử
 
 
 def _logsumexp(z):
@@ -30,7 +33,7 @@ def _logsumexp(z):
 @dataclass
 class Prediction:
     species: str
-    status: str            # ok | uncertain | not_leaf
+    status: str  # ok | uncertain | not_leaf
     label: str
     name_vi: str
     prob: float
@@ -44,7 +47,9 @@ class SpeciesModel:
         self.meta = json.loads((folder / "meta.json").read_text())
         so = ort.SessionOptions()
         so.intra_op_num_threads = 4
-        self.sess = ort.InferenceSession(str(folder / "model.onnx"), so, providers=["CPUExecutionProvider"])
+        self.sess = ort.InferenceSession(
+            str(folder / "model.onnx"), so, providers=["CPUExecutionProvider"]
+        )
         self.mean = np.array(self.meta["mean"], np.float32)[:, None, None]
         self.std = np.array(self.meta["std"], np.float32)[:, None, None]
 
@@ -82,8 +87,16 @@ class SpeciesModel:
             status = "uncertain"
         else:
             status = "ok"
-        return Prediction(self.species, status, self.meta["classes"][k], self.meta["names_vi"][k], float(probs[k]),
-                          float(energy), probs, ms)
+        return Prediction(
+            self.species,
+            status,
+            self.meta["classes"][k],
+            self.meta["names_vi"][k],
+            float(probs[k]),
+            float(energy),
+            probs,
+            ms,
+        )
 
 
 def available_models() -> dict[str, SpeciesModel]:
@@ -95,7 +108,9 @@ def available_models() -> dict[str, SpeciesModel]:
     return out
 
 
-def auto_predict(models: dict[str, SpeciesModel], img: Image.Image) -> tuple[Prediction, dict]:
+def auto_predict(
+    models: dict[str, SpeciesModel], img: Image.Image
+) -> tuple[Prediction, dict]:
     """Chạy mọi mô hình; chọn loài có năng lượng vượt ngưỡng τ_E nhiều nhất.
     Nếu không mô hình nào vượt ngưỡng -> ảnh không phải lá táo/cà chua."""
     preds = {sp: m.predict(img) for sp, m in models.items()}

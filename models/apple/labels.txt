@@ -1,0 +1,4 @@
+apple_healthy
+apple_scab
+apple_rust
+apple_black_rot

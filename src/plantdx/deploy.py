@@ -4,6 +4,7 @@ hiệu chỉnh (T*, τ_E, τ_c) tính lại trên chính mô hình INT8 được
   python -m plantdx.deploy --ckpt runs/apple/A-all/proposed/seed0/best.pt
 Kết quả: models/<loài>/ {model.onnx, model_fp32.onnx, labels.txt, meta.json}
 """
+
 from __future__ import annotations
 
 import argparse
@@ -16,12 +17,26 @@ import numpy as np
 import onnx
 import onnxruntime as ort
 import torch
-from onnxruntime.quantization import (CalibrationDataReader, CalibrationMethod, QuantFormat, QuantType,
-                                      quantize_static)
+from onnxruntime.quantization import (
+    CalibrationDataReader,
+    CalibrationMethod,
+    QuantFormat,
+    QuantType,
+    quantize_static,
+)
 from onnxruntime.quantization.shape_inference import quant_pre_process
 
 from .calibrate import evaluate_calibration, fit_calibration
-from .data import ROOT, VI_NAMES, PairDataset, build_transforms, domains_of, load_species, ood_sets, select
+from .data import (
+    ROOT,
+    VI_NAMES,
+    PairDataset,
+    build_transforms,
+    domains_of,
+    load_species,
+    ood_sets,
+    select,
+)
 from .models import load_ckpt
 
 MODELS = ROOT / "models"
@@ -38,7 +53,11 @@ class Calib(CalibrationDataReader):
     """Cấp từng ảnh cho bước hiệu chỉnh lượng tử hoá INT8."""
 
     def __init__(self, df, tf, input_name):
-        self.it = ({input_name: x[k:k + 1]} for x, _ in to_numpy_batches(df, tf) for k in range(len(x)))
+        self.it = (
+            {input_name: x[k : k + 1]}
+            for x, _ in to_numpy_batches(df, tf)
+            for k in range(len(x))
+        )
 
     def get_next(self):
         return next(self.it, None)
@@ -85,44 +104,85 @@ def main(argv=None):
     m = load_species(sp)
 
     fp32 = out / "model_fp32.onnx"
-    torch.onnx.export(model, (torch.randn(1, 3, size, size),), str(fp32), input_names=["input"],
-                      output_names=["logits"], dynamic_axes={"input": {0: "batch"}, "logits": {0: "batch"}},
-                      opset_version=17, dynamo=False)
+    torch.onnx.export(
+        model,
+        (torch.randn(1, 3, size, size),),
+        str(fp32),
+        input_names=["input"],
+        output_names=["logits"],
+        dynamic_axes={"input": {0: "batch"}, "logits": {0: "batch"}},
+        opset_version=17,
+        dynamo=False,
+    )
     pre = out / "_pre.onnx"
     quant_pre_process(str(fp32), str(pre))
     g = onnx.load(str(pre)).graph
     convs = [n.name for n in g.node if n.op_type in ("Conv", "Gemm")]
-    keep_fp32 = sorted({convs[0], convs[-1]} | {n.name for n in g.node if n.op_type == "Gemm"})
-    cal_df = select(m, train_doms, "train").sample(frac=1, random_state=0).groupby("dataset").head(
-        args.calib // len(train_doms))
+    keep_fp32 = sorted(
+        {convs[0], convs[-1]} | {n.name for n in g.node if n.op_type == "Gemm"}
+    )
+    cal_df = (
+        select(m, train_doms, "train")
+        .sample(frac=1, random_state=0)
+        .groupby("dataset")
+        .head(args.calib // len(train_doms))
+    )
     q = out / "model.onnx"
-    quantize_static(str(pre), str(q), Calib(cal_df, tf, "input"), quant_format=QuantFormat.QDQ, per_channel=True,
-                    weight_type=QuantType.QInt8, activation_type=QuantType.QUInt8,
-                    calibrate_method=CalibrationMethod.Percentile, op_types_to_quantize=["Conv", "Gemm"],
-                    nodes_to_exclude=keep_fp32,
-                    extra_options={"CalibPercentile": 99.99, "CalibMaxIntermediateOutputs": 50})
+    quantize_static(
+        str(pre),
+        str(q),
+        Calib(cal_df, tf, "input"),
+        quant_format=QuantFormat.QDQ,
+        per_channel=True,
+        weight_type=QuantType.QInt8,
+        activation_type=QuantType.QUInt8,
+        calibrate_method=CalibrationMethod.Percentile,
+        op_types_to_quantize=["Conv", "Gemm"],
+        nodes_to_exclude=keep_fp32,
+        extra_options={"CalibPercentile": 99.99, "CalibMaxIntermediateOutputs": 50},
+    )
     pre.unlink()
 
     # hiệu chỉnh trên chính mô hình INT8
     val = select(m, train_doms, "val")
     ood_v = ood_sets(sp, "val").sample(frac=1, random_state=0).head(args.ood_max)
     ood_t = ood_sets(sp, "test").sample(frac=1, random_state=0).head(args.ood_max)
-    cal = fit_calibration(onnx_logits(q, val, tf), val.label.to_numpy(), onnx_logits(q, ood_v, tf), args.target_acc)
+    cal = fit_calibration(
+        onnx_logits(q, val, tf),
+        val.label.to_numpy(),
+        onnx_logits(q, ood_v, tf),
+        args.target_acc,
+    )
     t_lg, t_y = {}, {}
     for d in domains_of(sp):
         df = select(m, [d], "test")
         t_lg[d], t_y[d] = onnx_logits(q, df, tf), df.label.to_numpy()
     cal["test"] = evaluate_calibration(cal, t_lg, t_y, onnx_logits(q, ood_t, tf))
 
-    meta = {"species": sp, "classes": classes, "names_vi": [VI_NAMES[c] for c in classes],
-            "model": ck["args"]["model"], "config": ck["args"]["config"], "setting": ck["args"]["setting"],
-            "source_ckpt": os.path.relpath(Path(args.ckpt).resolve(), ROOT),
-            "img_size": size, "resize": int(size * 1.14), "mean": ck["mean"], "std": ck["std"],
-            "size_mb": {"int8": q.stat().st_size / 1e6, "fp32": fp32.stat().st_size / 1e6},
-            "latency_ms_1thread": latency(q, size, 1, runs=100), **cal}
+    meta = {
+        "species": sp,
+        "classes": classes,
+        "names_vi": [VI_NAMES[c] for c in classes],
+        "model": ck["args"]["model"],
+        "config": ck["args"]["config"],
+        "setting": ck["args"]["setting"],
+        "source_ckpt": os.path.relpath(Path(args.ckpt).resolve(), ROOT),
+        "img_size": size,
+        "resize": int(size * 1.14),
+        "mean": ck["mean"],
+        "std": ck["std"],
+        "size_mb": {"int8": q.stat().st_size / 1e6, "fp32": fp32.stat().st_size / 1e6},
+        "latency_ms_1thread": latency(q, size, 1, runs=100),
+        **cal,
+    }
     (out / "meta.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False))
     (out / "labels.txt").write_text("\n".join(classes))
-    print(json.dumps({k: meta[k] for k in ["species", "T", "tau_energy", "tau_conf", "size_mb"]}, ensure_ascii=False))
+    print(
+        json.dumps(
+            {k: meta[k] for k in ["species", "T", "tau_energy", "tau_conf", "size_mb"]},
+            ensure_ascii=False,
+        )
+    )
     print(json.dumps(cal["test"], ensure_ascii=False))
 
 

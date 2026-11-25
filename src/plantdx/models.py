@@ -2,6 +2,7 @@
 
 Bản Linux: ưu tiên GPU NVIDIA (CUDA), bật TF32 + cuDNN benchmark, suy luận/huấn luyện với bfloat16 (AMP).
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -44,7 +45,11 @@ def to_device(model, dev):
 
 def batch_to(x, dev):
     x = x.to(dev, non_blocking=True)
-    return x.contiguous(memory_format=torch.channels_last) if dev.type == "cuda" and x.dim() == 4 else x
+    return (
+        x.contiguous(memory_format=torch.channels_last)
+        if dev.type == "cuda" and x.dim() == 4
+        else x
+    )
 
 
 def make_model(name: str, n_classes: int, pretrained=True):
@@ -92,8 +97,14 @@ def attach_mixstyle(model: nn.Module, name: str):
 
 # ----------------------------------------------------------------------------- suy luận
 def eval_loader(df, tf, workers=4, batch=128):
-    return DataLoader(PairDataset(df, tf), batch_size=batch, shuffle=False, num_workers=workers,
-                      persistent_workers=workers > 0, pin_memory=torch.cuda.is_available())
+    return DataLoader(
+        PairDataset(df, tf),
+        batch_size=batch,
+        shuffle=False,
+        num_workers=workers,
+        persistent_workers=workers > 0,
+        pin_memory=torch.cuda.is_available(),
+    )
 
 
 @torch.no_grad()

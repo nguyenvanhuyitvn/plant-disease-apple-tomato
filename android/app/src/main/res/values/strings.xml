@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Bệnh lá táo &amp; cà chua</string>
+    <string name="subtitle">Chụp một lá, rõ nét, chiếm phần lớn khung hình. Mô hình chạy offline trên máy.</string>
+    <string name="sp_auto">Tự động</string>
+    <string name="sp_apple">Táo</string>
+    <string name="sp_tomato">Cà chua</string>
+    <string name="take_photo">Chụp ảnh</string>
+    <string name="pick_photo">Chọn ảnh</string>
+    <string name="hint">Táo: lá khoẻ, ghẻ, gỉ sắt, thối đen.\nCà chua: lá khoẻ, đốm vi khuẩn, úa sớm, mốc sương, mốc lá, đốm lá Septoria, virus xoăn vàng lá, virus khảm.</string>
+    <string name="analyzing">Đang phân tích…</string>
+    <string name="maybe">Có thể: %1$s</string>
+    <string name="uncertain">Mô hình chưa chắc chắn. Hãy chụp lại gần hơn, đủ sáng, mặt lá có vết bệnh hướng lên.</string>
+    <string name="not_leaf_any">Có vẻ không phải lá táo hoặc cà chua</string>
+    <string name="not_leaf_one">Có vẻ không phải lá %1$s</string>
+    <string name="not_leaf_hint">Hãy chụp lại một chiếc lá rõ nét, chiếm phần lớn khung hình.</string>
+    <string name="species_auto">Loài nhận được: %1$s</string>
+    <string name="species_fixed">Mô hình: %1$s</string>
+    <string name="top_guesses">Ba khả năng cao nhất</string>
+    <string name="disclaimer">Kết quả chỉ mang tính tham khảo, không thay thế chẩn đoán của cán bộ bảo vệ thực vật. Mô hình chưa nhận ra được các bệnh ngoài danh sách trên.</string>
+</resources>

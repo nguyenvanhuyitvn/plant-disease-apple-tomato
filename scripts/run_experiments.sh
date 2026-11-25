@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Thực nghiệm (bản Linux + GPU NVIDIA): táo, cà chua; teacher ConvNeXt-T -> student MobileNetV3-L.
-# 6 thiết lập, 74 lần chạy (8 teacher/tham chiếu + 66 MobileNetV3). Chạy lại được: lần chạy đã có metrics.json sẽ bị bỏ qua.
+# 9 thiết lập, 111 lần chạy (11 teacher/tham chiếu + 100 MobileNetV3). Chạy lại được: lần chạy đã có metrics.json sẽ bị bỏ qua.
+# Cà chua có ba miền: pv, pd, tv (Tomato-Village, thêm sau). Lượt đầu (74 lần) đặt tên thiết lập PV+PD là "T-all";
+# trên server đã có lượt đó, đổi tên trước khi chạy tiếp để không bị bỏ qua nhầm:
+#   mv runs/tomato/T-all runs/tomato/T-LODO-TV
+#   ONLY="T-all T-LODO-PD T-LODO-PV" nohup bash scripts/run_experiments.sh > logs/run_tv.log 2>&1 &
+# Bước 2b tự chấm thêm miền tv cho các lần chạy cà chua cũ (T-LODO-TV, T0) rồi hiệu chỉnh lại.
 #
 #   bash scripts/run_experiments.sh           # chạy thật; dừng rồi chạy lại được
 #   nohup bash scripts/run_experiments.sh > logs/run.log 2>&1 &     # chạy nền, thoát SSH vẫn chạy
@@ -10,14 +15,14 @@
 #   PY=python                  trình thông dịch Python (mặc định .venv/bin/python; dùng PY=python với conda)
 #   WORKERS=8                  số tiến trình đọc ảnh mỗi lần huấn luyện (mặc định 8; tăng nếu GPU chờ CPU)
 #   AMP=0                      tắt bfloat16 tự động (mặc định bật)
-#   SEEDS="0 1 2"              seed của MobileNetV3 ở thiết lập chính (A-all, T-all)
-#   SEEDS_AUX="0 1 2"          seed ở thiết lập phụ (A-LODO-*, T0); SEEDS_AUX=0 để rút gọn
+#   SEEDS="0 1 2"              seed của MobileNetV3 ở thiết lập chính (A-all, T-all, T-LODO-TV)
+#   SEEDS_AUX="0 1 2"          seed ở thiết lập phụ (A-LODO-*, T0, T-LODO-PD, T-LODO-PV); SEEDS_AUX=0 để rút gọn
 #   ONLY="A-all T-all"         chỉ chạy các thiết lập này (vd. chia cho nhiều GPU bằng CUDA_VISIBLE_DEVICES)
 #   SKIP_POST=1                bỏ bước hiệu chỉnh / tổng hợp / xuất mô hình (chạy riêng sau khi mọi GPU xong)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 PY="${PY:-.venv/bin/python}"
-export PYTHONPATH=src PYTHONWARNINGS=ignore
+export PYTHONPATH=src PYTHONWARNINGS=ignore PYTHONUNBUFFERED=1   # ghi log ngay, không đợi đầy bộ đệm
 
 OUT=runs; EXTRA=()
 if [ "${QUICK:-0}" = 1 ]; then
@@ -37,12 +42,21 @@ train() { $PY -m plantdx.train --out "$OUT" "${TRAIN_OPTS[@]}" ${EXTRA[@]+"${EXT
 # setting  species  train-domains  main(1 = có đủ ablation + ResNet-50)
 SETTINGS=(
   "A-all      apple  pv,pp,pd  1"
-  "T-all      tomato pv,pd     1"
+  "T-LODO-TV  tomato pv,pd     1"   # lượt đầu gọi là T-all; TV là miền chưa thấy
   "A-LODO-PD  apple  pv,pp     0"
   "A-LODO-PP  apple  pv,pd     0"
   "A-LODO-PV  apple  pp,pd     0"   # không có ảnh PV -> không có cặp nền, "proposed" chỉ còn KD
   "T0         tomato pv        0"   # PV -> PlantDoc (kiểu bài báo gốc)
+  "T-all      tomato pv,pd,tv  1"   # cả ba miền cà chua
+  "T-LODO-PD  tomato pv,tv     0"
+  "T-LODO-PV  tomato pd,tv     0"   # không có ảnh PV -> không có cặp nền, "proposed" chỉ còn KD
 )
+
+# chặn trường hợp quên đổi tên T-all của lượt đầu (PV + PD): các lần chạy đó có metrics.json nên sẽ bị bỏ qua nhầm
+OLD=$(ls "$OUT"/tomato/T-all/*/seed*/metrics.json 2>/dev/null | head -1 || true)
+if [ -n "$OLD" ] && ! grep -q '"tv"' <(sed -n '/"train_domains"/,/]/p' "$OLD"); then
+  echo "LỖI: $OUT/tomato/T-all là lượt đầu (PV + PD). Đổi tên trước: mv $OUT/tomato/T-all $OUT/tomato/T-LODO-TV"; exit 1
+fi
 
 for row in "${SETTINGS[@]}"; do
   read -r SET SP DOMS MAIN <<< "$row"
@@ -66,6 +80,9 @@ for row in "${SETTINGS[@]}"; do
 done
 
 if [ "${SKIP_POST:-0}" = 1 ]; then echo "TRAIN DONE (bỏ qua bước sau huấn luyện)"; exit 0; fi
+
+# 2b) chấm thêm miền mới (tv) cho các lần chạy cũ chưa có; xoá calib.json của chúng để hiệu chỉnh lại
+$PY -m plantdx.eval_extra --runs "$OUT"
 
 # 3) hiệu chỉnh + lọc ảnh lạ cho mọi lần chạy
 OODMAX=2000; [ "${QUICK:-0}" = 1 ] && OODMAX=64

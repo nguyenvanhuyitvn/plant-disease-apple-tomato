@@ -1,0 +1,86 @@
+{
+  "species": "apple",
+  "classes": [
+    "apple_healthy",
+    "apple_scab",
+    "apple_rust",
+    "apple_black_rot"
+  ],
+  "names_vi": [
+    "Táo – Lá khỏe mạnh",
+    "Táo – Bệnh ghẻ (vảy táo)",
+    "Táo – Bệnh gỉ sắt",
+    "Táo – Thối đen / đốm mắt ếch"
+  ],
+  "model": "mobilenetv3_large_100",
+  "config": "proposed",
+  "setting": "A-all",
+  "source_ckpt": "runs/apple/A-all/proposed/seed0/best.pt",
+  "img_size": 224,
+  "resize": 255,
+  "mean": [
+    0.485,
+    0.456,
+    0.406
+  ],
+  "std": [
+    0.229,
+    0.224,
+    0.225
+  ],
+  "size_mb": {
+    "int8": 4.70153,
+    "fp32": 16.815788
+  },
+  "latency_ms_1thread": {
+    "mean_ms": 3.2503244932740927,
+    "p95_ms": 3.3614395186305046
+  },
+  "T": 0.6387939345304834,
+  "tau_energy": 0.28051358461380005,
+  "tau_conf": 0.0,
+  "target_acc": 0.9,
+  "val_coverage": 1.0,
+  "val_nll_before": 0.21686525642871857,
+  "val_nll_after": 0.1698632687330246,
+  "val_ece_before": 0.0721139520506694,
+  "val_ece_after": 0.007854991413700106,
+  "ood_val": {
+    "auroc": 0.4916143620325506,
+    "fpr_at_95tpr": 0.9493333333333334,
+    "id_kept_at_tau": 0.9496831904584421,
+    "ood_rejected_at_tau": 0.050666666666666665
+  },
+  "test": {
+    "pv": {
+      "ece_before": 0.09522715420652725,
+      "ece_after": 0.02335087572104024,
+      "aurc": 0.00024176691592992978,
+      "acc_all": 0.9950900163666121,
+      "coverage": 0.9950900163666121,
+      "acc_answered": 0.9950657894736842
+    },
+    "pp": {
+      "ece_before": 0.08122988882696901,
+      "ece_after": 0.008654702726736558,
+      "aurc": 0.008917152305772948,
+      "acc_all": 0.948499776085983,
+      "coverage": 0.93551276309897,
+      "acc_answered": 0.9631402584968884
+    },
+    "pd": {
+      "ece_before": 0.09881171759437114,
+      "ece_after": 0.14159307497389179,
+      "aurc": 0.04918885866960009,
+      "acc_all": 0.8529411764705882,
+      "coverage": 0.9117647058823529,
+      "acc_answered": 0.8387096774193549
+    },
+    "ood_test": {
+      "auroc": 0.5016726893676164,
+      "fpr_at_95tpr": 0.9653333333333334,
+      "id_kept_at_tau": 0.9478804725503822,
+      "ood_rejected_at_tau": 0.03666666666666667
+    }
+  }
+}
